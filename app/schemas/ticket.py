@@ -11,6 +11,13 @@ class TicketCreate(BaseModel):
     category: str
     priority: Optional[str] = "Medium"
 
+class TicketUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    category: Optional[str] = None
+    priority: Optional[str] = None
+    status: Optional[str] = None
+    assigned_agent: Optional[str] = None
 
 # Jab server client ko ticket data wapas bheje
 class TicketResponse(BaseModel):

@@ -10,6 +10,6 @@ app = FastAPI(title="SupportDesk API")
 
 app.include_router(tickets.router)
 
-@app.get("/health")
-def health_check():
+@app.get("/test")
+def test_check():
     return {"status": "ok", "message": "SupportDesk is running"}

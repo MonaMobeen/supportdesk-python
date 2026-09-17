@@ -2,9 +2,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from typing import List
-
+from app.schemas.ticket import TicketCreate, TicketResponse, TicketUpdate
 from app.database import SessionLocal
-from app.schemas.ticket import TicketCreate, TicketResponse
 from app.services import ticket_service
 
 router = APIRouter(prefix="/tickets", tags=["Tickets"])
@@ -35,3 +34,15 @@ def get_ticket(ticket_id: int, db: Session = Depends(get_db)):
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
     return ticket
+
+
+@router.put("/{ticket_id}", response_model=TicketResponse)
+def update_ticket(ticket_id: int, ticket: TicketUpdate, db: Session = Depends(get_db)):
+    try:
+        updated = ticket_service.update_ticket(db, ticket_id, ticket)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    if not updated:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    return updated

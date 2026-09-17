@@ -23,3 +23,4 @@ class Ticket(Base):
         onupdate=func.now()
     )
     resolution_at = Column(DateTime(timezone=True), nullable=True)
+    resolution_note = Column(Text, nullable=True)

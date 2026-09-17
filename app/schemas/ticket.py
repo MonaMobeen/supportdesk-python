@@ -18,6 +18,7 @@ class TicketUpdate(BaseModel):
     priority: Optional[str] = None
     status: Optional[str] = None
     assigned_agent: Optional[str] = None
+    resolution_note: Optional[str] = None
 
 # Jab server client ko ticket data wapas bheje
 class TicketResponse(BaseModel):

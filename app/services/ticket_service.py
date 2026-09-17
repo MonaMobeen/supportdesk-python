@@ -4,6 +4,14 @@ from app.models.ticket import Ticket
 from app.schemas.ticket import TicketCreate
 
 
+# Valid status transitions define kar rahe hain
+VALID_TRANSITIONS = {
+    "Open": ["In Progress", "Closed"],
+    "In Progress": ["Resolved", "Open"],
+    "Resolved": ["Closed", "In Progress"],
+    "Closed": ["Open"],  # sirf reopen ho sakta hai
+}
+
 def create_ticket(db: Session, ticket_data: TicketCreate) -> Ticket:
     new_ticket = Ticket(
         title=ticket_data.title,
@@ -33,11 +41,24 @@ def update_ticket(db: Session, ticket_id: int, ticket_data: TicketUpdate):
     if not ticket:
         return None
 
-    # Business Rule: Closed ticket edit nahi ho sakta
-    if ticket.status == "Closed":
-        raise ValueError("Cannot edit a closed ticket")
-
     update_data = ticket_data.model_dump(exclude_unset=True)
+
+    # Agar status change ho raha hai, to rules check karo
+    if "status" in update_data:
+        new_status = update_data["status"]
+        current_status = ticket.status
+
+        if new_status != current_status:
+            allowed = VALID_TRANSITIONS.get(current_status, [])
+            if new_status not in allowed:
+                raise ValueError(
+                    f"Cannot change status from '{current_status}' to '{new_status}'"
+                )
+
+            # Business Rule: Closed karte waqt resolution note zaroori hai
+            if new_status == "Closed" and not update_data.get("resolution_note") and not ticket.resolution_note:
+                raise ValueError("Resolution note is required to close a ticket")
+
     for field, value in update_data.items():
         setattr(ticket, field, value)
 

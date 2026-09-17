@@ -1,8 +1,15 @@
 from fastapi import FastAPI
 
-app = FastAPI(title="SupportDesk")
+from app.database import Base, engine
+from app.models import ticket
+from app.routers import tickets
 
+Base.metadata.create_all(bind=engine)
 
-@app.get("/")
-def home():
-    return {"message": "SupportDesk is running"}
+app = FastAPI(title="SupportDesk API")
+
+app.include_router(tickets.router)
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "message": "SupportDesk is running"}

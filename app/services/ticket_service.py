@@ -3,7 +3,7 @@ from app.schemas.ticket import TicketUpdate
 from app.models.ticket import Ticket
 from app.schemas.ticket import TicketCreate
 from app.models.agent import Agent
-
+from app.services import history_service
 
 VALID_TRANSITIONS = {
     "Open": ["In Progress", "Closed"],
@@ -52,7 +52,6 @@ def update_ticket(db: Session, ticket_id: int, ticket_data: TicketUpdate):
             if new_status == "Closed" and not update_data.get("resolution_note") and not ticket.resolution_note:
                 raise ValueError("Resolution note is required to close a ticket")
 
-    # Business Rule: Agent exist karna chahiye tabhi assign ho
     if "assigned_agent" in update_data and update_data["assigned_agent"]:
         agent_exists = db.query(Agent).filter(
             Agent.name == update_data["assigned_agent"]
@@ -62,7 +61,13 @@ def update_ticket(db: Session, ticket_id: int, ticket_data: TicketUpdate):
                 f"Agent '{update_data['assigned_agent']}' does not exist"
             )
 
+    # Tracked fields — inme change ho to history mein likh do
+    tracked_fields = ["status", "priority", "assigned_agent"]
+
     for field, value in update_data.items():
+        old_value = getattr(ticket, field)
+        if field in tracked_fields and old_value != value:
+            history_service.log_change(db, ticket_id, field, old_value, value)
         setattr(ticket, field, value)
 
     db.commit()

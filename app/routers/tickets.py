@@ -7,7 +7,8 @@ from app.database import SessionLocal
 from app.services import ticket_service
 from app.schemas.comment import CommentCreate, CommentResponse
 from app.services import comment_service
-
+from app.schemas.history import HistoryResponse
+from app.services import history_service
 router = APIRouter(prefix="/tickets", tags=["Tickets"])
 
 
@@ -63,3 +64,10 @@ def list_comments(ticket_id: int, db: Session = Depends(get_db)):
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
     return comment_service.get_comments_by_ticket(db, ticket_id)
+
+@router.get("/{ticket_id}/history", response_model=List[HistoryResponse])
+def get_ticket_history(ticket_id: int, db: Session = Depends(get_db)):
+    ticket = ticket_service.get_ticket_by_id(db, ticket_id)
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    return history_service.get_history_by_ticket(db, ticket_id)

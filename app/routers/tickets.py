@@ -96,7 +96,7 @@ def export_tickets(
         headers={"Content-Disposition": "attachment; filename=tickets_export.csv"},
     )
     
-    @router.get("/reports/summary")
+@router.get("/reports/summary")
 def dashboard_summary(db: Session = Depends(get_db)):
     return ticket_service.get_dashboard_summary(db)
 

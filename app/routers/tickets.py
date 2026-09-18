@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from app.schemas.ticket import TicketCreate, TicketResponse, TicketUpdate
 from app.database import SessionLocal
+from fastapi.responses import StreamingResponse
 from app.services import ticket_service
 from app.schemas.comment import CommentCreate, CommentResponse
 from app.services import comment_service
@@ -70,7 +71,30 @@ def list_tickets(
         "results": [TicketResponse.model_validate(t) for t in tickets],
     }
 
+@router.post("/import")
+async def import_tickets(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    if not file.filename.endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Only CSV files are supported")
 
+    contents = await file.read()
+    result = ticket_service.import_tickets_from_csv(db, contents)
+    return result
+
+
+@router.get("/export")
+def export_tickets(
+    status: Optional[str] = Query(None),
+    priority: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    tickets, _ = ticket_service.get_all_tickets(db, status=status, priority=priority, limit=10000)
+    csv_file = ticket_service.export_tickets_to_csv(tickets)
+
+    return StreamingResponse(
+        csv_file,
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=tickets_export.csv"},
+    )
 @router.get("/{ticket_id}", response_model=TicketResponse)
 def get_ticket(ticket_id: int, db: Session = Depends(get_db)):
     ticket = ticket_service.get_ticket_by_id(db, ticket_id)
@@ -140,3 +164,5 @@ def download_attachment(ticket_id: int, attachment_id: int, db: Session = Depend
     if not attachment or attachment.ticket_id != ticket_id:
         raise HTTPException(status_code=404, detail="Attachment not found")
     return FileResponse(attachment.filepath, filename=attachment.filename)
+
+ 

@@ -7,7 +7,8 @@ from app.services import history_service
 from typing import Optional
 from datetime import datetime
 from sqlalchemy import or_
-
+import csv
+import io
 
 VALID_TRANSITIONS = {
     "Open": ["In Progress", "Closed"],
@@ -130,3 +131,75 @@ def update_ticket(db: Session, ticket_id: int, ticket_data: TicketUpdate):
     db.commit()
     db.refresh(ticket)
     return ticket
+
+REQUIRED_IMPORT_FIELDS = ["title", "description", "requester", "category"]
+VALID_PRIORITIES = ["Low", "Medium", "High", "Critical"]
+
+
+def import_tickets_from_csv(db: Session, file_contents: bytes):
+    text = file_contents.decode("utf-8")
+    reader = csv.DictReader(io.StringIO(text))
+
+    successful = []
+    failed = []
+
+    for row_number, row in enumerate(reader, start=2):  # row 1 = header
+        # Missing fields check karo
+        missing = [f for f in REQUIRED_IMPORT_FIELDS if not row.get(f)]
+        if missing:
+            failed.append({
+                "row": row_number,
+                "reason": f"Missing required fields: {', '.join(missing)}"
+            })
+            continue
+
+        priority = row.get("priority", "Medium").strip() or "Medium"
+        if priority not in VALID_PRIORITIES:
+            failed.append({
+                "row": row_number,
+                "reason": f"Invalid priority '{priority}'. Must be one of {VALID_PRIORITIES}"
+            })
+            continue
+
+        try:
+            new_ticket = Ticket(
+                title=row["title"],
+                description=row["description"],
+                requester=row["requester"],
+                category=row["category"],
+                priority=priority,
+            )
+            db.add(new_ticket)
+            db.commit()
+            db.refresh(new_ticket)
+            successful.append(new_ticket.id)
+        except Exception as e:
+            db.rollback()
+            failed.append({"row": row_number, "reason": str(e)})
+
+    return {
+        "total_rows": len(successful) + len(failed),
+        "successful_count": len(successful),
+        "failed_count": len(failed),
+        "successful_ticket_ids": successful,
+        "failed_rows": failed,
+    }
+
+
+def export_tickets_to_csv(tickets):
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    writer.writerow([
+        "id", "title", "description", "requester", "category",
+        "priority", "status", "assigned_agent", "created_at", "updated_at"
+    ])
+
+    for t in tickets:
+        writer.writerow([
+            t.id, t.title, t.description, t.requester, t.category,
+            t.priority, t.status, t.assigned_agent or "", t.created_at, t.updated_at
+        ])
+
+    output.seek(0)
+    return output

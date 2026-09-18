@@ -4,6 +4,10 @@ from app.models.ticket import Ticket
 from app.schemas.ticket import TicketCreate
 from app.models.agent import Agent
 from app.services import history_service
+from typing import Optional
+from datetime import datetime
+from sqlalchemy import or_
+
 
 VALID_TRANSITIONS = {
     "Open": ["In Progress", "Closed"],
@@ -25,8 +29,61 @@ def create_ticket(db: Session, ticket_data: TicketCreate) -> Ticket:
     db.refresh(new_ticket)
     return new_ticket
 
-def get_all_tickets(db: Session):
-    return db.query(Ticket).all()
+
+def get_all_tickets(
+    db: Session,
+    status: Optional[str] = None,
+    priority: Optional[str] = None,
+    category: Optional[str] = None,
+    requester: Optional[str] = None,
+    assigned_agent: Optional[str] = None,
+    created_after: Optional[datetime] = None,
+    created_before: Optional[datetime] = None,
+    search: Optional[str] = None,
+    sort_by: str = "created_at",
+    order: str = "desc",
+    skip: int = 0,
+    limit: int = 20,
+):
+    query = db.query(Ticket)
+
+    # Filters
+    if status:
+        query = query.filter(Ticket.status == status)
+    if priority:
+        query = query.filter(Ticket.priority == priority)
+    if category:
+        query = query.filter(Ticket.category == category)
+    if requester:
+        query = query.filter(Ticket.requester == requester)
+    if assigned_agent:
+        query = query.filter(Ticket.assigned_agent == assigned_agent)
+    if created_after:
+        query = query.filter(Ticket.created_at >= created_after)
+    if created_before:
+        query = query.filter(Ticket.created_at <= created_before)
+
+    # Search (title ya description mein text dhoondo)
+    if search:
+        query = query.filter(
+            or_(
+                Ticket.title.ilike(f"%{search}%"),
+                Ticket.description.ilike(f"%{search}%"),
+            )
+        )
+
+    # Sorting
+    sort_column = getattr(Ticket, sort_by, Ticket.created_at)
+    if order == "asc":
+        query = query.order_by(sort_column.asc())
+    else:
+        query = query.order_by(sort_column.desc())
+
+    # Pagination (bade result set ko control karna)
+    total = query.count()
+    tickets = query.offset(skip).limit(limit).all()
+
+    return tickets, total
 
 def get_ticket_by_id(db: Session, ticket_id: int):
     return db.query(Ticket).filter(Ticket.id == ticket_id).first()

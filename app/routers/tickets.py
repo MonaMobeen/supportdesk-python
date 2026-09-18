@@ -1,6 +1,5 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from fastapi import HTTPException
 from typing import List
 from app.schemas.ticket import TicketCreate, TicketResponse, TicketUpdate
 from app.database import SessionLocal
@@ -9,6 +8,9 @@ from app.schemas.comment import CommentCreate, CommentResponse
 from app.services import comment_service
 from app.schemas.history import HistoryResponse
 from app.services import history_service
+from datetime import datetime
+from typing import Optional
+from datetime import datetime
 router = APIRouter(prefix="/tickets", tags=["Tickets"])
 
 
@@ -26,9 +28,43 @@ def create_ticket(ticket: TicketCreate, db: Session = Depends(get_db)):
     return ticket_service.create_ticket(db, ticket)
 
 
-@router.get("/", response_model=List[TicketResponse])
-def list_tickets(db: Session = Depends(get_db)):
-    return ticket_service.get_all_tickets(db)
+@router.get("/")
+def list_tickets(
+    status: Optional[str] = Query(None),
+    priority: Optional[str] = Query(None),
+    category: Optional[str] = Query(None),
+    requester: Optional[str] = Query(None),
+    assigned_agent: Optional[str] = Query(None),
+    created_after: Optional[datetime] = Query(None),
+    created_before: Optional[datetime] = Query(None),
+    search: Optional[str] = Query(None),
+    sort_by: str = Query("created_at"),
+    order: str = Query("desc"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    db: Session = Depends(get_db),
+):
+    tickets, total = ticket_service.get_all_tickets(
+        db,
+        status=status,
+        priority=priority,
+        category=category,
+        requester=requester,
+        assigned_agent=assigned_agent,
+        created_after=created_after,
+        created_before=created_before,
+        search=search,
+        sort_by=sort_by,
+        order=order,
+        skip=skip,
+        limit=limit,
+    )
+    return {
+        "total": total,
+        "skip": skip,
+        "limit": limit,
+        "results": [TicketResponse.model_validate(t) for t in tickets],
+    }
 
 
 @router.get("/{ticket_id}", response_model=TicketResponse)

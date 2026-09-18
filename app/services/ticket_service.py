@@ -5,8 +5,9 @@ from app.schemas.ticket import TicketCreate
 from app.models.agent import Agent
 from app.services import history_service
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy import or_
+from sqlalchemy import func as sql_func
 import csv
 import io
 

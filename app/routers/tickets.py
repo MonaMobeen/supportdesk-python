@@ -95,6 +95,16 @@ def export_tickets(
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=tickets_export.csv"},
     )
+    
+    @router.get("/reports/summary")
+def dashboard_summary(db: Session = Depends(get_db)):
+    return ticket_service.get_dashboard_summary(db)
+
+
+@router.get("/reports/overdue")
+def overdue_tickets(db: Session = Depends(get_db)):
+    tickets = ticket_service.get_overdue_tickets(db)
+    return [TicketResponse.model_validate(t) for t in tickets]
 @router.get("/{ticket_id}", response_model=TicketResponse)
 def get_ticket(ticket_id: int, db: Session = Depends(get_db)):
     ticket = ticket_service.get_ticket_by_id(db, ticket_id)

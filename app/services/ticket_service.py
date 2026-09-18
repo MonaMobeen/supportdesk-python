@@ -109,6 +109,9 @@ def update_ticket(db: Session, ticket_id: int, ticket_data: TicketUpdate):
 
             if new_status == "Closed" and not update_data.get("resolution_note") and not ticket.resolution_note:
                 raise ValueError("Resolution note is required to close a ticket")
+            
+            if new_status in ["Resolved", "Closed"] and current_status not in ["Resolved", "Closed"]:
+                update_data["resolution_at"] = datetime.utcnow()
 
     if "assigned_agent" in update_data and update_data["assigned_agent"]:
         agent_exists = db.query(Agent).filter(
@@ -203,3 +206,67 @@ def export_tickets_to_csv(tickets):
 
     output.seek(0)
     return output
+
+OVERDUE_THRESHOLD_HOURS = 48  # 48 ghante se zyada Open/In Progress = overdue
+
+
+def get_dashboard_summary(db: Session):
+    total = db.query(Ticket).count()
+
+    # Status ke hisaab se count
+    status_counts = dict(
+        db.query(Ticket.status, sql_func.count(Ticket.id))
+        .group_by(Ticket.status)
+        .all()
+    )
+
+    # Priority ke hisaab se count
+    priority_counts = dict(
+        db.query(Ticket.priority, sql_func.count(Ticket.id))
+        .group_by(Ticket.priority)
+        .all()
+    )
+
+    # Har agent ke paas kitne Open tickets hain
+    open_by_agent = dict(
+        db.query(Ticket.assigned_agent, sql_func.count(Ticket.id))
+        .filter(Ticket.status.in_(["Open", "In Progress"]))
+        .filter(Ticket.assigned_agent.isnot(None))
+        .group_by(Ticket.assigned_agent)
+        .all()
+    )
+
+    # Average resolution time (Resolved/Closed tickets ke liye)
+    resolved_tickets = (
+        db.query(Ticket)
+        .filter(Ticket.status.in_(["Resolved", "Closed"]))
+        .filter(Ticket.resolution_at.isnot(None))
+        .all()
+    )
+    if resolved_tickets:
+        total_seconds = sum(
+            (t.resolution_at - t.created_at).total_seconds() for t in resolved_tickets
+        )
+        avg_hours = round((total_seconds / len(resolved_tickets)) / 3600, 2)
+    else:
+        avg_hours = None
+
+    return {
+        "total_tickets": total,
+        "by_status": status_counts,
+        "by_priority": priority_counts,
+        "open_tickets_by_agent": open_by_agent,
+        "average_resolution_time_hours": avg_hours,
+    }
+
+
+def get_overdue_tickets(db: Session):
+    threshold_time = datetime.utcnow() - timedelta(hours=OVERDUE_THRESHOLD_HOURS)
+
+    overdue = (
+        db.query(Ticket)
+        .filter(Ticket.status.in_(["Open", "In Progress"]))
+        .filter(Ticket.created_at <= threshold_time)
+        .all()
+    )
+    return overdue

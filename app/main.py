@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
 from app.database import Base, engine
-from app.models import ticket, agent, comment
+from app.models import ticket, agent, comment, history
 from app.routers import tickets, agents
 
 Base.metadata.create_all(bind=engine)

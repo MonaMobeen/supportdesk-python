@@ -3,10 +3,11 @@ import uuid
 from sqlalchemy.orm import Session
 from fastapi import UploadFile
 from app.models.attachment import Attachment
+from app.config import UPLOAD_DIR, MAX_UPLOAD_SIZE_MB
 
-UPLOAD_DIR = "app/uploads"
+MAX_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024
 ALLOWED_TYPES = {"image/png", "image/jpeg", "application/pdf", "text/plain"}
-MAX_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB
+ 
 
 
 def validate_file(file: UploadFile, size_bytes: int):

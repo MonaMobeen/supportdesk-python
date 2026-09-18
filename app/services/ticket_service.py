@@ -3,6 +3,8 @@ from app.schemas.ticket import TicketUpdate
 from app.models.ticket import Ticket
 from app.schemas.ticket import TicketCreate
 from app.models.agent import Agent
+from app.logger import logger
+from app.config import OVERDUE_THRESHOLD_HOURS
 from app.services import history_service
 from typing import Optional
 from datetime import datetime, timedelta
@@ -29,6 +31,7 @@ def create_ticket(db: Session, ticket_data: TicketCreate) -> Ticket:
     db.add(new_ticket)
     db.commit()
     db.refresh(new_ticket)
+    logger.info(f"Ticket created: id={new_ticket.id}, title='{new_ticket.title}'")
     return new_ticket
 
 
@@ -103,37 +106,70 @@ def update_ticket(db: Session, ticket_id: int, ticket_data: TicketUpdate):
 
         if new_status != current_status:
             allowed = VALID_TRANSITIONS.get(current_status, [])
+
             if new_status not in allowed:
+                # NEW: Added warning log for invalid status transition
+                logger.warning(
+                    f"Invalid status transition attempted: "
+                    f"{current_status} -> {new_status}"
+                )
                 raise ValueError(
                     f"Cannot change status from '{current_status}' to '{new_status}'"
                 )
 
-            if new_status == "Closed" and not update_data.get("resolution_note") and not ticket.resolution_note:
-                raise ValueError("Resolution note is required to close a ticket")
-            
-            if new_status in ["Resolved", "Closed"] and current_status not in ["Resolved", "Closed"]:
+            if (
+                new_status == "Closed"
+                and not update_data.get("resolution_note")
+                and not ticket.resolution_note
+            ):
+                # NEW: Added warning log when resolution note is missing
+                logger.warning(
+                    f"Attempted to close ticket {ticket_id} without a resolution note"
+                )
+                raise ValueError(
+                    "Resolution note is required to close a ticket"
+                )
+
+            if (
+                new_status in ["Resolved", "Closed"]
+                and current_status not in ["Resolved", "Closed"]
+            ):
                 update_data["resolution_at"] = datetime.utcnow()
 
     if "assigned_agent" in update_data and update_data["assigned_agent"]:
         agent_exists = db.query(Agent).filter(
             Agent.name == update_data["assigned_agent"]
         ).first()
+
         if not agent_exists:
+            # NEW: Added warning log when agent does not exist
+            logger.warning(
+                f"Attempted to assign ticket {ticket_id} to "
+                f"non-existent agent '{update_data['assigned_agent']}'"
+            )
             raise ValueError(
                 f"Agent '{update_data['assigned_agent']}' does not exist"
             )
 
-    # Tracked fields — inme change ho to history mein likh do
     tracked_fields = ["status", "priority", "assigned_agent"]
 
     for field, value in update_data.items():
         old_value = getattr(ticket, field)
+
         if field in tracked_fields and old_value != value:
-            history_service.log_change(db, ticket_id, field, old_value, value)
+            history_service.log_change(
+                db, ticket_id, field, old_value, value
+            )
+
         setattr(ticket, field, value)
 
     db.commit()
     db.refresh(ticket)
+
+    logger.info(
+        f"Ticket updated: id={ticket_id}, fields={list(update_data.keys())}"
+    )
+
     return ticket
 
 REQUIRED_IMPORT_FIELDS = ["title", "description", "requester", "category"]
@@ -207,9 +243,6 @@ def export_tickets_to_csv(tickets):
 
     output.seek(0)
     return output
-
-OVERDUE_THRESHOLD_HOURS = 48  # 48 ghante se zyada Open/In Progress = overdue
-
 
 def get_dashboard_summary(db: Session):
     total = db.query(Ticket).count()

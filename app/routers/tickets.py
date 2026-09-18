@@ -7,6 +7,10 @@ from app.services import ticket_service
 from app.schemas.comment import CommentCreate, CommentResponse
 from app.services import comment_service
 from app.schemas.history import HistoryResponse
+from fastapi import UploadFile, File
+from fastapi.responses import FileResponse
+from app.schemas.attachment import AttachmentResponse
+from app.services import attachment_service
 from app.services import history_service
 from datetime import datetime
 from typing import Optional
@@ -107,3 +111,32 @@ def get_ticket_history(ticket_id: int, db: Session = Depends(get_db)):
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
     return history_service.get_history_by_ticket(db, ticket_id)
+
+@router.post("/{ticket_id}/attachments", response_model=AttachmentResponse)
+async def upload_attachment(ticket_id: int, file: UploadFile = File(...), db: Session = Depends(get_db)):
+    ticket = ticket_service.get_ticket_by_id(db, ticket_id)
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    contents = await file.read()
+
+    try:
+        return attachment_service.save_attachment(db, ticket_id, file, contents)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/{ticket_id}/attachments", response_model=List[AttachmentResponse])
+def list_attachments(ticket_id: int, db: Session = Depends(get_db)):
+    ticket = ticket_service.get_ticket_by_id(db, ticket_id)
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    return attachment_service.get_attachments_by_ticket(db, ticket_id)
+
+
+@router.get("/{ticket_id}/attachments/{attachment_id}/download")
+def download_attachment(ticket_id: int, attachment_id: int, db: Session = Depends(get_db)):
+    attachment = attachment_service.get_attachment_by_id(db, attachment_id)
+    if not attachment or attachment.ticket_id != ticket_id:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+    return FileResponse(attachment.filepath, filename=attachment.filename)

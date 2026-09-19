@@ -25,3 +25,5 @@ __pycache__/
 Thumbs.db
 
 app/uploads
+ 
+ app.log 

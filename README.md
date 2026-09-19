@@ -338,17 +338,55 @@ curl -X POST http://127.0.0.1:8000/agents/ \
 ---
 
 ## 13. Deployment
-
-> To be completed after deployment — this section will include:
-> - The live, publicly accessible URL
-> - The chosen hosting platform and why
-> - How configuration/secrets are supplied in the deployed environment
-> - Confirmation that persisted data survives a restart/redeploy
-> - The health-check endpoint used for deployment verification
-> - What would be changed for a higher-traffic production system
-
+ 
+**Live URL**: `https://supportdesk-python.onrender.com/` 
+**Interactive API docs (live)**: `https://supportdesk-python.onrender.com/docs`
+**Test check (live)**: `https://supportdesk-python.onrender.com/test`
+ 
+### Platform Choice
+ 
+The application is deployed as two separate pieces, each on the free tier of a different provider:
+ 
+| Piece | Provider | Why |
+|---|---|---|
+| **Web Service** (the FastAPI app) | [Render](https://render.com) | Deploys directly from a GitHub repository, detects Python automatically, provides a free HTTPS URL, and needs no credit card for a standard free web service |
+| **Database** (PostgreSQL) | [Neon](https://neon.tech) | Genuinely free, permanent Postgres tier with no credit card requirement and no forced expiry — unlike some providers' free databases, which expire after a fixed number of days |
+ 
+Locally, the project uses **SQLite** (simple, zero setup, ideal for development). In the deployed environment, **PostgreSQL (via Neon)** is used instead, because the requirement is that persisted data must survive process restarts — a hosting provider's local disk is not guaranteed to persist between deploys/restarts, but a managed Postgres database is. No application code changes were needed to switch databases — only the `DATABASE_URL` value, because the app reads its database connection through SQLAlchemy via `app/config.py`.
+ 
+### Configuration in the Deployed Environment
+ 
+Secrets and environment-specific values are set directly in Render's **Environment Variables** dashboard for the service — never committed to the repository:
+ 
+| Key | Purpose |
+|---|---|
+| `DATABASE_URL` | Neon PostgreSQL connection string |
+| `UPLOAD_DIR` | `app/uploads` |
+| `MAX_UPLOAD_SIZE_MB` | `5` |
+| `OVERDUE_THRESHOLD_HOURS` | `48` |
+ 
+### Build & Start Configuration (Render)
+ 
+- **Build Command**: `pip install -r requirements.txt`
+- **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+### Persistence Across Restarts
+ 
+Because ticket data lives in the Neon PostgreSQL database (not on Render's local filesystem), restarting or redeploying the web service does **not** delete or reset application data — only the running process restarts; the database is a separate, independently hosted service.
+ 
+### Test Check
+ 
+`GET /test` is used to verify the deployed service is running:
+```json
+{"status": "ok", "message": "SupportDesk is running"}
+```
+ 
+### What Would Change for a Higher-Traffic Production System
+ 
+- Move off the free tiers to paid instances with guaranteed uptime (Render's free web service spins down after inactivity, causing a slow "cold start" on the next request).
+- Move attachment storage from local disk to a dedicated object storage service (e.g., S3-compatible storage), since local disk on most free/managed hosts is not guaranteed to persist or scale.
+- Introduce a proper database migration tool (e.g., Alembic) instead of manual schema/table recreation.
+- Add real authentication/authorization instead of the simplified identity fields used in this capstone.
+- Add connection pooling tuning and monitoring/alerting for the database and application.
 ---
-
-## 14. Final Reflection
-
-> To be completed at project end — a short account of the hardest issue encountered during development, how it was debugged, and what would be improved with more time.
+ 
+ 

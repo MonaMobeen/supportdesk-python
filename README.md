@@ -1,0 +1,354 @@
+# SupportDesk — Service Request & Support Ticket Management System
+
+A backend-only Python capstone project that gives a support team one reliable place to register, manage, track, search, and report on support requests from creation to closure.
+
+---
+
+## 1. Project Overview & Business Problem
+
+A small company currently receives support requests through chat messages, email, and verbal follow-ups. Requests are easily lost, there is no consistent ownership, and managers cannot see which issues are open, overdue, or already resolved.
+
+**SupportDesk** solves this by providing a single backend service where:
+- Requesters can log issues and track them
+- Support Agents can take ownership, update status, and resolve requests
+- Administrators/Team Leads can oversee the whole operation, assign work, and view reports
+
+The system supports these roles **conceptually** through the data model and endpoint behavior (a requester creates/views tickets, an agent updates/resolves them, an admin views everything and assigns work). A full authentication/authorization system was intentionally not built — see the Engineering Decision Log for the reasoning.
+
+---
+
+## 2. Feature List
+
+| Area | Features |
+|---|---|
+| **Ticket Lifecycle** | Create, view, update tickets; assign/reassign to agents; status lifecycle (Open → In Progress → Resolved → Closed) with enforced valid transitions; reopen support; priority levels (Low/Medium/High/Critical) |
+| **Comments** | Add chronological comments to a ticket without overwriting previous ones |
+| **Activity History** | Automatic audit trail of status, priority, and assignment changes (old value, new value, timestamp) |
+| **Search / Filter / Sort / Pagination** | Filter by status, priority, category, requester, assignee, created-date range; text search on title/description; sorting; paginated results with total count |
+| **Attachments** | Upload files to a ticket with type and size validation; list and download attachments |
+| **Import / Export** | Bulk-import tickets from CSV with per-row validation and a success/failure summary; export a filtered set of tickets to CSV |
+| **Reporting** | Dashboard summary (total tickets, counts by status/priority, open tickets per agent, average resolution time); overdue/aging ticket detection |
+| **Reliability** | Centralized configuration via `.env`, structured logging to console and file, a global exception handler that returns clean JSON errors instead of raw tracebacks |
+| **Testing** | Automated test suite (pytest) covering business rules, CRUD, filters, import, and a mocked dependency-failure scenario |
+
+### Known Limitations
+
+- No real authentication/authorization — role behavior is demonstrated through endpoint design, not enforced via login sessions or tokens.
+- SQLite is used as the database, which is suitable for this capstone's scale but not for high-concurrency production use.
+- Attachments are stored on local disk, not on a dedicated object-storage service.
+- No database migration tool (e.g., Alembic) is used yet — schema changes during development required recreating the database.
+
+---
+
+## 3. Project Structure
+
+```
+supportdesk/
+├── app/
+│   ├── main.py                # App entry point, router registration, global exception handler
+│   ├── config.py               # Centralized configuration (reads from .env)
+│   ├── logger.py                # Logging setup
+│   ├── database.py             # SQLAlchemy engine/session setup
+│   ├── models/                  # SQLAlchemy ORM models (database tables)
+│   │   ├── ticket.py
+│   │   ├── agent.py
+│   │   ├── comment.py
+│   │   ├── history.py
+│   │   └── attachment.py
+│   ├── schemas/                 # Pydantic schemas (request/response validation)
+│   │   ├── ticket.py
+│   │   ├── agent.py
+│   │   ├── comment.py
+│   │   ├── history.py
+│   │   └── attachment.py
+│   ├── services/                 # Business logic layer
+│   │   ├── ticket_service.py
+│   │   ├── agent_service.py
+│   │   ├── comment_service.py
+│   │   ├── history_service.py
+│   │   └── attachment_service.py
+│   ├── routers/                   # API route definitions
+│   │   ├── tickets.py
+│   │   └── agents.py
+│   └── uploads/                    # Uploaded attachment files (git-ignored)
+├── tests/
+│   ├── conftest.py               # Test database and client fixtures
+│   ├── test_tickets.py           # Core business rule tests
+│   ├── test_import.py             # Import validation tests
+│   └── test_failures.py           # Mocked dependency-failure test
+├── .env                            # Environment configuration (not committed)
+├── .gitignore
+├── requirements.txt
+└── README.md
+```
+
+**Separation of concerns**: `routers` handle HTTP request/response only, `services` contain business logic, `models` define database structure, `schemas` define validation rules for data entering/leaving the API. This keeps logic testable and avoids one oversized file.
+
+---
+
+## 4. Local Setup Instructions (From a Clean Machine)
+
+### Prerequisites
+- Python 3.10+ installed
+- Git installed
+
+### Steps
+
+```bash
+# 1. Clone the repository
+git clone <your-repo-url>
+cd supportdesk
+
+# 2. Create and activate a virtual environment
+python -m venv venv
+
+# Windows (CMD):
+venv\Scripts\activate
+# Windows (Git Bash):
+source venv/Scripts/activate
+# Mac/Linux:
+source venv/bin/activate
+
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Create your .env file (see Configuration section below)
+
+# 5. Run the application
+uvicorn app.main:app --reload
+```
+
+The API will be available at `http://127.0.0.1:8000`
+Interactive API docs (Swagger UI): `http://127.0.0.1:8000/docs`
+
+### `requirements.txt` (dependency list)
+
+```
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+python-dotenv
+python-multipart
+pytest
+httpx
+```
+
+Generate/update this file anytime with:
+```bash
+pip freeze > requirements.txt
+```
+
+---
+
+## 5. Configuration / Environment Variables
+
+Create a `.env` file in the project root:
+
+```
+DATABASE_URL=sqlite:///./app.db
+UPLOAD_DIR=app/uploads
+MAX_UPLOAD_SIZE_MB=5
+OVERDUE_THRESHOLD_HOURS=48
+```
+
+| Variable | Purpose | Example |
+|---|---|---|
+| `DATABASE_URL` | Database connection string | `sqlite:///./app.db` |
+| `UPLOAD_DIR` | Folder where attachment files are stored | `app/uploads` |
+| `MAX_UPLOAD_SIZE_MB` | Maximum allowed attachment size | `5` |
+| `OVERDUE_THRESHOLD_HOURS` | Hours after which an unresolved ticket is considered overdue | `48` |
+
+`.env` is excluded from version control via `.gitignore` — configuration and secrets are never hard-coded into source code (NFR-06).
+
+---
+
+## 6. How to Run the Application
+
+```bash
+uvicorn app.main:app --reload
+```
+
+Health check (used to verify the service is running):
+```
+GET /health
+```
+Expected response:
+```json
+{"status": "ok", "message": "SupportDesk is running"}
+```
+
+---
+
+## 7. How to Run Tests
+
+```bash
+python -m pytest -v
+```
+
+This runs the full automated test suite covering:
+- Valid and invalid ticket creation
+- Valid and forbidden status transitions
+- Resolution note requirement before closing
+- Agent assignment and reassignment (valid and invalid agent)
+- Search and status filtering
+- CSV import with mixed valid/invalid rows
+- A mocked database failure to confirm the global error handler responds safely instead of crashing
+
+Tests use a separate SQLite database (`test.db`), created fresh and destroyed after each test — the real `app.db` is never touched by the test suite.
+
+---
+
+## 8. API Usage — Example Requests & Workflows
+
+Full interactive documentation is available at `/docs`. Key examples:
+
+### Create a ticket
+```bash
+curl -X POST http://127.0.0.1:8000/tickets/ \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Login page not loading",
+    "description": "Getting blank screen on login",
+    "requester": "Ali Khan",
+    "category": "Bug",
+    "priority": "High"
+  }'
+```
+
+### Update ticket status (with resolution note)
+```bash
+curl -X PUT http://127.0.0.1:8000/tickets/1 \
+  -H "Content-Type: application/json" \
+  -d '{"status": "Closed", "resolution_note": "Fixed by clearing cache"}'
+```
+
+### Search and filter tickets
+```bash
+GET /tickets/?status=Open&priority=High&search=login&sort_by=created_at&order=desc&skip=0&limit=20
+```
+
+### Add a comment
+```bash
+curl -X POST http://127.0.0.1:8000/tickets/1/comments \
+  -H "Content-Type: application/json" \
+  -d '{"author": "Sara Ahmed", "text": "Investigating the issue"}'
+```
+
+### View ticket history
+```
+GET /tickets/1/history
+```
+
+### Upload an attachment
+```
+POST /tickets/1/attachments   (multipart/form-data, field name: file)
+```
+
+### Bulk import tickets from CSV
+```
+POST /tickets/import   (multipart/form-data, field name: file, .csv only)
+```
+
+### Export tickets to CSV
+```
+GET /tickets/export?status=Open
+```
+
+### Dashboard summary
+```
+GET /tickets/reports/summary
+```
+
+### Overdue tickets
+```
+GET /tickets/reports/overdue
+```
+
+### Register an agent (reference data — Admin capability)
+```bash
+curl -X POST http://127.0.0.1:8000/agents/ \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Fatima Noor", "email": "fatima@company.com"}'
+```
+
+---
+
+## 9. Engineering Decision Log
+
+| Decision Area | Chosen Option | Alternative Considered | Why Chosen | Trade-off / Limitation |
+|---|---|---|---|---|
+| **API Framework** | FastAPI | Flask, Django REST Framework | Built-in async support, automatic request validation via Pydantic, auto-generated interactive docs (`/docs`) which double as a demo interface — no separate frontend needed | Smaller ecosystem than Django for things like admin panels |
+| **Database** | SQLite (via SQLAlchemy) | PostgreSQL | Zero setup, file-based, sufficient for this capstone's data volume and single-instance deployment | Not suitable for high-concurrency production use or multiple app instances writing simultaneously |
+| **Data Access** | SQLAlchemy ORM | Raw SQL queries | Prevents SQL injection by design, makes schema changes and relationships (foreign keys) easier to manage and read | Slight performance overhead vs. hand-tuned raw SQL; abstracts away some SQL-specific optimizations |
+| **Project Structure** | Layered (routers → services → models/schemas) | Single-file script | Keeps business logic separate from HTTP handling and database structure, making each layer independently testable | More files to navigate for a project of this size, but scales better if features grow |
+| **Role/Identity Handling** | Simple identity fields passed in request data (e.g., `requester`, `assigned_agent`, comment `author`) rather than full authentication | JWT-based login/auth system, OAuth | The PDF explicitly leaves identity/authorization implementation as a free decision and lists complex auth/SSO as out of scope; the project's focus is backend business logic, not access control | No real security boundary between roles — anyone calling the API can act as any role. Documented here as a known limitation and would be the first addition for production use |
+| **Validation** | Pydantic schemas + Python `Enum` for fixed value sets (priority) | Manual `if` checks | Declarative, automatic, and produces clear `422` errors without extra code | Enum error messages are framework-generated and less customizable than hand-written validation |
+| **Attachment Storage** | Local disk (`app/uploads`) with unique filenames (UUID-prefixed) | Cloud object storage (S3, etc.) | Simple, no external account/service required for a capstone project; sufficient for demonstrating the feature | Not durable across redeployments on some hosting platforms; would need persistent disk or object storage in production |
+| **Import/Export Format** | CSV, using Python's built-in `csv` module | JSON, Excel (`openpyxl`) | CSV is the most common structured format for bulk ticket data and needs no extra dependency | Less rich than Excel (no formatting/multiple sheets); acceptable per the "at least one common format" requirement |
+| **Testing Library** | pytest + FastAPI's `TestClient` (httpx) | unittest | Simpler syntax, widely used with FastAPI, supports fixtures for clean test database setup/teardown | N/A |
+| **Mocking Strategy** | `unittest.mock.patch` on the ORM model to simulate a database failure | A real broken database connection | Lets us test the failure path safely and repeatably without an actual outage | Only tests the code's *reaction* to failure, not real database failure modes (timeouts, deadlocks) |
+| **Dependency Management** | `pip` + `requirements.txt` | Poetry, pipenv | Simplest, most universally supported approach; no extra tooling needed | Less strict dependency locking than Poetry's lockfile |
+| **Configuration** | `.env` file + `python-dotenv`, centralized in `app/config.py` | Hard-coded values, OS environment variables set manually | Keeps secrets/config out of source code (NFR-06) while remaining simple for local development | `.env` file itself must still be kept out of version control and handled carefully in deployment |
+| **Logging** | Python's built-in `logging` module, writing to console and `app.log` | Third-party logging libraries (structlog, loguru) | No extra dependency, sufficient for this project's scale, easy to inspect during review | Less structured (not JSON) than production-grade logging setups |
+| **Error Handling** | Centralized FastAPI exception handler for unexpected errors + explicit `HTTPException` for expected business errors | Try/except in every route | Guarantees no raw traceback ever reaches the client (NFR-10 security basic), while still distinguishing expected (400/404) from unexpected (500) failures | A single unexpected-error handler gives a generic message; more granular custom exception types could give richer error categorization in a larger system |
+
+---
+
+## 10. Business Rules Enforced
+
+- Ticket IDs are auto-generated and never change after creation.
+- A ticket cannot be marked Resolved or Closed without a resolution note.
+- Status can only move through defined valid transitions (invalid transitions return `400`).
+- A Closed ticket can only be edited by first reopening it.
+- A ticket cannot be assigned to an agent that does not exist in the Agent reference table.
+- Invalid data (bad enum values, missing required fields) is rejected — never silently ignored.
+- Timestamps (`created_at`, `updated_at`, `resolution_at`) are system-generated, not user-supplied.
+
+## 11. Edge Cases Handled
+
+| Edge Case | Handling |
+|---|---|
+| Ticket ID does not exist | `404 Not Found` |
+| Missing mandatory fields | `422 Validation Error` (Pydantic) |
+| Unsupported status/priority | `422` (priority enum) / `400` (status transition rule) |
+| Invalid status transition | `400` with a clear message |
+| Assignment to invalid agent | `400` with a clear message |
+| Corrupted/invalid import file | Non-CSV files rejected at upload; malformed rows reported individually |
+| Import file with valid + invalid rows | Valid rows are saved; invalid rows are reported with reasons — one bad row does not block the rest |
+| Unsupported attachment type / oversized file | `400` with a clear message before saving |
+| No records match a filter/search | `200` with an empty `results` array and `total: 0`, not an error |
+| Unexpected internal exception | Caught by the global exception handler, logged, and returned as a generic `500` — no stack trace exposed to the client |
+
+---
+
+## 12. Demo Scenarios
+
+1. **Create a valid High/Critical ticket** — `POST /tickets/` with `priority: "Critical"`, confirm it's returned by `GET /tickets/{id}`.
+2. **Attempt an invalid ticket creation** — omit `title` or use `priority: "Urgent"`, observe the `422` validation response.
+3. **Full lifecycle** — assign a ticket to a registered agent, move it Open → In Progress → Resolved, add a comment along the way, then close it with a resolution note; view its history afterward.
+4. **Invalid status transition** — attempt Closed → In Progress directly, observe the `400` rejection.
+5. **Search and filter at scale** — import several tickets via CSV, then filter/search/paginate the results.
+6. **Import with mixed rows** — upload a CSV with valid and invalid rows, review the returned success/failure summary.
+7. **Reporting metric change** — check `GET /tickets/reports/summary`, resolve a ticket, check again — `average_resolution_time_hours` updates.
+8. **Restart persistence check** — stop and restart the server, confirm previously created tickets are still present (SQLite file persists on disk).
+9. **Run the automated test suite** — `python -m pytest -v`, showing all business-rule and failure-mocking tests passing.
+10. **Logs for normal and error flow** — show `app.log` containing an `INFO` line for a successful ticket creation and an `ERROR` line for a caught exception, with no secrets exposed.
+
+---
+
+## 13. Deployment
+
+> To be completed after deployment — this section will include:
+> - The live, publicly accessible URL
+> - The chosen hosting platform and why
+> - How configuration/secrets are supplied in the deployed environment
+> - Confirmation that persisted data survives a restart/redeploy
+> - The health-check endpoint used for deployment verification
+> - What would be changed for a higher-traffic production system
+
+---
+
+## 14. Final Reflection
+
+> To be completed at project end — a short account of the hardest issue encountered during development, how it was debugged, and what would be improved with more time.

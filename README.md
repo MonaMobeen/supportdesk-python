@@ -169,9 +169,9 @@ OVERDUE_THRESHOLD_HOURS=48
 uvicorn app.main:app --reload
 ```
 
-Health check (used to verify the service is running):
+Test check (used to verify the service is running):
 ```
-GET /health
+GET /test
 ```
 Expected response:
 ```json

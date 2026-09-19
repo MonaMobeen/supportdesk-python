@@ -210,7 +210,7 @@ curl -X POST http://127.0.0.1:8000/tickets/ \
   -d '{
     "title": "Login page not loading",
     "description": "Getting blank screen on login",
-    "requester": "Ali Khan",
+    "requester": "Mona Mobeen",
     "category": "Bug",
     "priority": "High"
   }'
@@ -232,7 +232,7 @@ GET /tickets/?status=Open&priority=High&search=login&sort_by=created_at&order=de
 ```bash
 curl -X POST http://127.0.0.1:8000/tickets/1/comments \
   -H "Content-Type: application/json" \
-  -d '{"author": "Sara Ahmed", "text": "Investigating the issue"}'
+  -d '{"author": "Hooria khan", "text": "Investigating the issue"}'
 ```
 
 ### View ticket history
@@ -269,7 +269,7 @@ GET /tickets/reports/overdue
 ```bash
 curl -X POST http://127.0.0.1:8000/agents/ \
   -H "Content-Type: application/json" \
-  -d '{"name": "Fatima Noor", "email": "fatima@company.com"}'
+  -d '{"name": "Minal Noor", "email": "minal@facebook.com"}'
 ```
 
 ---

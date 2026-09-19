@@ -389,4 +389,48 @@ Because ticket data lives in the Neon PostgreSQL database (not on Render's local
 - Add connection pooling tuning and monitoring/alerting for the database and application.
 ---
  
+  
+## 14. Final Reflection
+ 
+### The Hardest Issue: Missing Dependencies Crashing the App on Startup
+ 
+**What happened**
+ 
+While adding the file-attachment feature, a new endpoint was written to accept file uploads (`POST /tickets/{id}/attachments`). The moment the server was restarted to test it, the app failed to start at all:
+ 
+```
+RuntimeError: Form data requires "python-multipart" to be installed.
+```
+ 
+This was more disruptive than a normal `400`/`500` error during a request — the **entire application refused to boot**, so every endpoint (not just the new one) was unreachable.
+ 
+**Why it happened**
+ 
+FastAPI supports file uploads through `UploadFile`, but the actual parsing of multipart form data (the format browsers/Postman use to send files) is handled by a separate library, `python-multipart`. It isn't installed automatically with FastAPI itself, so a route that *declares* a file-upload parameter fails at import time if that library is missing — even before any request is ever made.
+ 
+**How it was debugged**
+ 
+- The error message was read carefully rather than treated as unrelated noise — it directly named the missing package and even suggested the fix (`pip install python-multipart`).
+- After installing it, the *same* error still appeared once, which was confusing at first — this turned out to be a version-mismatch between `fastapi` and `python-multipart` rather than a missing install, and was resolved by reinstalling a specific compatible version and upgrading `fastapi`.
+- The fix was verified by restarting the server and confirming the app booted cleanly, then re-testing the upload endpoint itself.
+**The trade-off this exposed**
+ 
+A single missing optional dependency was able to take down the *entire* application, not just the one feature that needed it — there was no isolation between features at the dependency level. It also revealed that `requirements.txt` needs to be kept genuinely in sync with what the code uses, rather than assumed to be complete.
+ 
+**What would be improved with more time**
+ 
+- Regenerate and review `requirements.txt` (via `pip freeze`) after every new feature that introduces a new import, rather than only near the end of the project.
+- Add a basic startup smoke test (even just importing `app.main` in CI) that would catch a boot-time failure like this automatically, before it's discovered manually.
+- Pin exact dependency versions (not just names) in `requirements.txt` to avoid the kind of version-mismatch surprise encountered here, especially before deployment to a different machine/environment.
+### Other Notable Issues Along the Way
+ 
+| Issue | Root Cause | Resolution |
+|---|---|---|
+| A new `resolution_note` column caused `no such column` errors after being added to the model | SQLite doesn't alter existing tables automatically when a SQLAlchemy model changes — `create_all()` only creates tables that don't exist yet | Deleted and recreated the local development database; documented the need for a real migration tool as a limitation |
+| `/tickets/reports/summary` returned a `404 "Ticket not found"` instead of the report | FastAPI matches routes in the order they're defined — a `/{ticket_id}` route defined above `/reports/summary` treats `"reports"` as if it were a ticket ID | Reordered the routes so fixed-path endpoints (`/import`, `/export`, `/reports/...`) are declared before the dynamic `/{ticket_id}` route |
+| A mocked "database failure" test failed even though the app was behaving correctly | FastAPI's `TestClient` re-raises unhandled exceptions by default during tests — different from how a real client experiences a `500` response | Set `raise_server_exceptions=False` on the test client so the global exception handler could be verified the way a real caller would see it |
+ 
+### General Takeaway
+ 
+The most disruptive problems in this project weren't wrong business logic — they were **things outside the application code itself**: an uninstalled dependency, a mismatched package version, and the order routes were declared in. Each produced an error that looked unrelated to its real cause at first glance. The habit that consistently cut through the confusion was the same each time: **read the exact error message and traceback line before changing anything**, rather than guessing. With more time, the next priorities would be a proper migration tool, pinned dependency versions, and a basic startup check in the test suite to catch boot-time failures automatically.
  

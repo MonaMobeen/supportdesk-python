@@ -38,6 +38,36 @@ The system supports these roles **conceptually** through the data model and endp
 - Attachments are stored on local disk, not on a dedicated object-storage service.
 - No database migration tool (e.g., Alembic) is used yet — schema changes during development required recreating the database.
 
+
+### Role-to-Endpoint Mapping
+ 
+The system has no login/authentication layer (see Known Limitations above), so every endpoint is technically callable by anyone. The table below shows which endpoints each of the three business roles based on their defined capabilities.
+ 
+| Endpoint | Requester | Support Agent | Administrator |
+|---|:---:|:---:|:---:|
+| `POST /tickets/` (create a ticket) | ✅ | | |
+| `GET /tickets/{id}` (view a ticket) | ✅ (own) | ✅ | ✅ |
+| `GET /tickets/` (list, filter, search) | | ✅ (own queue) | ✅ (all) |
+| `PUT /tickets/{id}` — status/priority update | | ✅ | ✅ |
+| `PUT /tickets/{id}` — assign/reassign agent | | | ✅ |
+| `POST /tickets/{id}/comments` (add comment) | ✅ | ✅ | ✅ |
+| `GET /tickets/{id}/comments` (view comments) | ✅ | ✅ | ✅ |
+| `GET /tickets/{id}/history` (audit trail) | | | ✅ |
+| `POST /tickets/{id}/attachments` (upload file) | ✅ (own ticket) | ✅ | ✅ |
+| `GET /tickets/{id}/attachments` (list/download) | ✅ (own ticket) | ✅ | ✅ |
+| `POST /agents/` (register an agent — reference data) | | | ✅ |
+| `GET /agents/` (list agents) | | ✅ | ✅ |
+| `POST /tickets/import` (bulk import CSV) | | | ✅ |
+| `GET /tickets/export` (export CSV) | | | ✅ |
+| `GET /tickets/reports/summary` (dashboard) | | | ✅ |
+| `GET /tickets/reports/overdue` (aging tickets) | | | ✅ |
+ 
+**How each role maps to its capabilities:**
+ 
+- **Requester** — *"Create requests, view their requests, add information/comments"* → covered by ticket creation, viewing a ticket (or filtering `GET /tickets/?requester=<name>`), and the comments endpoints.
+- **Support Agent** — *"View work queue, take ownership, update status/priority, comment, resolve requests"* → covered by filtering tickets by `assigned_agent`/`status`, the assignment and status-update paths on `PUT /tickets/{id}`, and the comments endpoint. Resolving/closing a ticket is the same `PUT` endpoint with `status: "Resolved"` or `"Closed"`.
+- **Administrator / Team Lead** — *"View all requests, assign work, maintain reference data, view reports"* → covered by the unfiltered ticket list, the agent-assignment path, the Agent endpoints (the "reference data" being maintained), and the reporting endpoints.
+---
 ---
 
 ## 3. Project Structure
@@ -430,7 +460,7 @@ A single missing optional dependency was able to take down the *entire* applicat
 | `/tickets/reports/summary` returned a `404 "Ticket not found"` instead of the report | FastAPI matches routes in the order they're defined — a `/{ticket_id}` route defined above `/reports/summary` treats `"reports"` as if it were a ticket ID | Reordered the routes so fixed-path endpoints (`/import`, `/export`, `/reports/...`) are declared before the dynamic `/{ticket_id}` route |
 | A mocked "database failure" test failed even though the app was behaving correctly | FastAPI's `TestClient` re-raises unhandled exceptions by default during tests — different from how a real client experiences a `500` response | Set `raise_server_exceptions=False` on the test client so the global exception handler could be verified the way a real caller would see it |
  
-### General Takeaway
+### Key Takeaway
  
 The most disruptive problems in this project weren't wrong business logic — they were **things outside the application code itself**: an uninstalled dependency, a mismatched package version, and the order routes were declared in. Each produced an error that looked unrelated to its real cause at first glance. The habit that consistently cut through the confusion was the same each time: **read the exact error message and traceback line before changing anything**, rather than guessing. With more time, the next priorities would be a proper migration tool, pinned dependency versions, and a basic startup check in the test suite to catch boot-time failures automatically.
  

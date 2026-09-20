@@ -31,17 +31,10 @@ The system supports these roles **conceptually** through the data model and endp
 | **Reliability** | Centralized configuration via `.env`, structured logging to console and file, a global exception handler that returns clean JSON errors instead of raw tracebacks |
 | **Testing** | Automated test suite (pytest) covering business rules, CRUD, filters, import, and a mocked dependency-failure scenario |
 
-### Known Limitations
-
-- No real authentication/authorization — role behavior is demonstrated through endpoint design, not enforced via login sessions or tokens.
-- SQLite is used as the database, which is suitable for this capstone's scale but not for high-concurrency production use.
-- Attachments are stored on local disk, not on a dedicated object-storage service.
-- No database migration tool (e.g., Alembic) is used yet — schema changes during development required recreating the database.
-
 
 ### Role-to-Endpoint Mapping
- 
-The system has no login/authentication layer (see Known Limitations above), so every endpoint is technically callable by anyone. The table below shows which endpoints each of the three business roles based on their defined capabilities.
+  
+   The table below shows which endpoints each of the three business roles based on their capabilities.
  
 | Endpoint | Requester | Support Agent | Administrator |
 |---|:---:|:---:|:---:|

@@ -32,37 +32,6 @@ The system supports these roles **conceptually** through the data model and endp
 | **Testing** | Automated test suite (pytest) covering business rules, CRUD, filters, import, and a mocked dependency-failure scenario |
 
 
-### Role-to-Endpoint Mapping
-  
-   The table below shows which endpoints each of the three business roles based on their capabilities.
- 
-| Endpoint | Requester | Support Agent | Administrator |
-|---|:---:|:---:|:---:|
-| `POST /tickets/` (create a ticket) | ✅ | | |
-| `GET /tickets/{id}` (view a ticket) | ✅ (own) | ✅ | ✅ |
-| `GET /tickets/` (list, filter, search) | | ✅ (own queue) | ✅ (all) |
-| `PUT /tickets/{id}` — status/priority update | | ✅ | ✅ |
-| `PUT /tickets/{id}` — assign/reassign agent | | | ✅ |
-| `POST /tickets/{id}/comments` (add comment) | ✅ | ✅ | ✅ |
-| `GET /tickets/{id}/comments` (view comments) | ✅ | ✅ | ✅ |
-| `GET /tickets/{id}/history` (audit trail) | | | ✅ |
-| `POST /tickets/{id}/attachments` (upload file) | ✅ (own ticket) | ✅ | ✅ |
-| `GET /tickets/{id}/attachments` (list/download) | ✅ (own ticket) | ✅ | ✅ |
-| `POST /agents/` (register an agent — reference data) | | | ✅ |
-| `GET /agents/` (list agents) | | ✅ | ✅ |
-| `POST /tickets/import` (bulk import CSV) | | | ✅ |
-| `GET /tickets/export` (export CSV) | | | ✅ |
-| `GET /tickets/reports/summary` (dashboard) | | | ✅ |
-| `GET /tickets/reports/overdue` (aging tickets) | | | ✅ |
- 
-**How each role maps to its capabilities:**
- 
-- **Requester** — *"Create requests, view their requests, add information/comments"* → covered by ticket creation, viewing a ticket (or filtering `GET /tickets/?requester=<name>`), and the comments endpoints.
-- **Support Agent** — *"View work queue, take ownership, update status/priority, comment, resolve requests"* → covered by filtering tickets by `assigned_agent`/`status`, the assignment and status-update paths on `PUT /tickets/{id}`, and the comments endpoint. Resolving/closing a ticket is the same `PUT` endpoint with `status: "Resolved"` or `"Closed"`.
-- **Administrator / Team Lead** — *"View all requests, assign work, maintain reference data, view reports"* → covered by the unfiltered ticket list, the agent-assignment path, the Agent endpoints (the "reference data" being maintained), and the reporting endpoints.
----
----
-
 ## 3. Project Structure
 
 ```
@@ -294,7 +263,36 @@ curl -X POST http://127.0.0.1:8000/agents/ \
   -H "Content-Type: application/json" \
   -d '{"name": "Minal Noor", "email": "minal@facebook.com"}'
 ```
-
+### Role-to-Endpoint Mapping
+  
+   The table below shows which endpoints each of the three business roles based on their capabilities.
+ 
+| Endpoint | Requester | Support Agent | Administrator |
+|---|:---:|:---:|:---:|
+| `POST /tickets/` (create a ticket) | ✅ | | |
+| `GET /tickets/{id}` (view a ticket) | ✅ (own) | ✅ | ✅ |
+| `GET /tickets/` (list, filter, search) | | ✅ (own queue) | ✅ (all) |
+| `PUT /tickets/{id}` — status/priority update | | ✅ | ✅ |
+| `PUT /tickets/{id}` — assign/reassign agent | | | ✅ |
+| `POST /tickets/{id}/comments` (add comment) | ✅ | ✅ | ✅ |
+| `GET /tickets/{id}/comments` (view comments) | ✅ | ✅ | ✅ |
+| `GET /tickets/{id}/history` (audit trail) | | | ✅ |
+| `POST /tickets/{id}/attachments` (upload file) | ✅ (own ticket) | ✅ | ✅ |
+| `GET /tickets/{id}/attachments` (list/download) | ✅ (own ticket) | ✅ | ✅ |
+| `POST /agents/` (register an agent — reference data) | | | ✅ |
+| `GET /agents/` (list agents) | | ✅ | ✅ |
+| `POST /tickets/import` (bulk import CSV) | | | ✅ |
+| `GET /tickets/export` (export CSV) | | | ✅ |
+| `GET /tickets/reports/summary` (dashboard) | | | ✅ |
+| `GET /tickets/reports/overdue` (aging tickets) | | | ✅ |
+ 
+**How each role maps to its capabilities:**
+ 
+- **Requester** — *"Create requests, view their requests, add information/comments"* → covered by ticket creation, viewing a ticket (or filtering `GET /tickets/?requester=<name>`), and the comments endpoints.
+- **Support Agent** — *"View work queue, take ownership, update status/priority, comment, resolve requests"* → covered by filtering tickets by `assigned_agent`/`status`, the assignment and status-update paths on `PUT /tickets/{id}`, and the comments endpoint. Resolving/closing a ticket is the same `PUT` endpoint with `status: "Resolved"` or `"Closed"`.
+- **Administrator / Team Lead** — *"View all requests, assign work, maintain reference data, view reports"* → covered by the unfiltered ticket list, the agent-assignment path, the Agent endpoints (the "reference data" being maintained), and the reporting endpoints.
+---
+---
 ---
 
 ## 9. Engineering Decision Log

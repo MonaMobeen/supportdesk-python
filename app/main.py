@@ -11,7 +11,7 @@ from app.routers import tickets, agents
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="SupportDesk API")
-
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.include_router(tickets.router)
 app.include_router(agents.router)
 @app.get("/test")
@@ -28,4 +28,4 @@ async def global_exception_handler(request: Request, exc: Exception):
     
 @app.get("/ui")
 def serve_ui():
-    return FileResponse("app/static/index.html")    
+    return FileResponse("app/static/index.html") 

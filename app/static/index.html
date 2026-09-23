@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SupportDesk</title>
+<style>
+  body { font-family: Arial, sans-serif; max-width: 900px; margin: 30px auto; padding: 0 20px; background: #f5f5f5; }
+  h1 { color: #2c3e50; }
+  form { background: white; padding: 20px; border-radius: 8px; margin-bottom: 30px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  input, select, textarea { display: block; width: 100%; margin-bottom: 10px; padding: 8px; box-sizing: border-box; }
+  button { background: #2c3e50; color: white; border: none; padding: 10px 16px; border-radius: 5px; cursor: pointer; }
+  .ticket { background: white; padding: 15px; border-radius: 8px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+  .status { font-weight: bold; padding: 3px 8px; border-radius: 4px; font-size: 12px; }
+  .Open { background: #dbeafe; color: #1e40af; }
+  .In.Progress { background: #fef9c3; color: #854d0e; }
+  .Resolved { background: #dcfce7; color: #166534; }
+  .Closed { background: #f3f4f6; color: #4b5563; }
+</style>
+</head>
+<body>
+
+<h1>🎫 SupportDesk</h1>
+
+<form id="createForm">
+  <h3>Create New Ticket</h3>
+  <input type="text" id="title" placeholder="Title" required>
+  <textarea id="description" placeholder="Description" required></textarea>
+  <input type="text" id="requester" placeholder="Your Name" required>
+  <input type="text" id="category" placeholder="Category (e.g. Bug, Hardware)" required>
+  <select id="priority">
+    <option>Low</option>
+    <option selected>Medium</option>
+    <option>High</option>
+    <option>Critical</option>
+  </select>
+  <button type="submit">Create Ticket</button>
+</form>
+
+<h3>All Tickets</h3>
+<div id="ticketList">Loading...</div>
+
+<script>
+const API_URL = "";  
+
+async function loadTickets() {
+  const res = await fetch(`${API_URL}/tickets/`);
+  const data = await res.json();
+  const container = document.getElementById("ticketList");
+  container.innerHTML = "";
+
+  data.results.forEach(ticket => {
+    const div = document.createElement("div");
+    div.className = "ticket";
+    div.innerHTML = `
+      <strong>#${ticket.id} — ${ticket.title}</strong>
+      <span class="status ${ticket.status.replace(" ", ".")}">${ticket.status}</span>
+      <p>${ticket.description}</p>
+      <small>By: ${ticket.requester} | Priority: ${ticket.priority} | Agent: ${ticket.assigned_agent || "Unassigned"}</small>
+      <br><br>
+      <select onchange="updateStatus(${ticket.id}, this.value)">
+        <option value="">Change Status...</option>
+        <option value="Open">Open</option>
+        <option value="In Progress">In Progress</option>
+        <option value="Resolved">Resolved</option>
+        <option value="Closed">Closed</option>
+      </select>
+    `;
+    container.appendChild(div);
+  });
+}
+
+async function updateStatus(ticketId, newStatus) {
+  if (!newStatus) return;
+  const body = { status: newStatus };
+  if (newStatus === "Closed" || newStatus === "Resolved") {
+    const note = prompt("Enter resolution note:");
+    if (note) body.resolution_note = note;
+  }
+
+  const res = await fetch(`${API_URL}/tickets/${ticketId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    const err = await res.json();
+    alert("Error: " + err.detail);
+  }
+  loadTickets();
+}
+
+document.getElementById("createForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const ticket = {
+    title: document.getElementById("title").value,
+    description: document.getElementById("description").value,
+    requester: document.getElementById("requester").value,
+    category: document.getElementById("category").value,
+    priority: document.getElementById("priority").value
+  };
+
+  const res = await fetch(`${API_URL}/tickets/`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(ticket)
+  });
+
+  if (res.ok) {
+    e.target.reset();
+    loadTickets();
+  } else {
+    alert("Error creating ticket");
+  }
+});
+
+loadTickets();
+</script>
+
+</body>
+</html>

@@ -59,6 +59,10 @@ supportdesk/
 │   │   ├── comment_service.py
 │   │   ├── history_service.py
 │   │   └── attachment_service.py
+│   ├── static/                     # Optional minimal UI (served at /ui)
+│   │   ├── index.html                # Page structure
+│   │   ├── style.css                  # Styling
+│   │   └── script.js                   # Frontend logic (calls the API via fetch)
 │   ├── routers/                   # API route definitions
 │   │   ├── tickets.py
 │   │   └── agents.py
@@ -170,6 +174,15 @@ Expected response:
 {"status": "ok", "message": "SupportDesk is running"}
 ```
 
+### Optional Minimal UI
+ 
+ A minimal HTML/CSS/JavaScript interface was added anyway, purely as a visual convenience on top of the same API:
+ 
+```
+GET /ui
+```
+ 
+It lets a user create a ticket and change a ticket's status from a simple web page instead of the Swagger form. It calls the exact same endpoints documented in this README (`POST /tickets/`, `PUT /tickets/{id}`, `GET /tickets/`) — no separate API or logic was written for it. The three concerns are kept in separate files (`index.html` for structure, `style.css` for styling, `script.js` for behavior), consistent with the separation-of-concerns approach used throughout the backend.
 ---
 
 ## 7. How to Run Tests

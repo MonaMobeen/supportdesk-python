@@ -176,13 +176,14 @@ Expected response:
 
 ### Optional Minimal UI
  
- A minimal HTML/CSS/JavaScript interface was added anyway, purely as a visual convenience on top of the same API:
+A minimal HTML/CSS/JavaScript interface was added anyway, purely as a visual convenience on top of the same API:
  
 ```
 GET /ui
 ```
  
 It lets a user create a ticket and change a ticket's status from a simple web page instead of the Swagger form. It calls the exact same endpoints documented in this README (`POST /tickets/`, `PUT /tickets/{id}`, `GET /tickets/`) — no separate API or logic was written for it. The three concerns are kept in separate files (`index.html` for structure, `style.css` for styling, `script.js` for behavior), consistent with the separation-of-concerns approach used throughout the backend.
+ 
 ---
 
 ## 7. How to Run Tests

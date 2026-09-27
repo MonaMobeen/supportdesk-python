@@ -374,9 +374,9 @@ curl -X POST http://127.0.0.1:8000/agents/ \
 
 ## 13. Deployment
  
-**Live URL**: `https://supportdesk-python.onrender.com/` 
-**Interactive API docs (live)**: `https://supportdesk-python.onrender.com/docs`
-**Test check (live)**: `https://supportdesk-python.onrender.com/test`
+**Live URL**: `https://supportdesk-python-ui.onrender.com/` 
+**Interactive API docs (live)**: `https://supportdesk-python-ui.onrender.com/docs#`
+**Test check (live)**: `https://supportdesk-python-ui.onrender.com/test`
  
 ### Platform Choice
  
